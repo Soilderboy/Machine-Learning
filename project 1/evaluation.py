@@ -44,9 +44,9 @@ class Evaluation:
         return metrics
     
     #save results in csv
-    def save_results(self, results, csv_path):
+    #fieldnames for logistic regression: dataset, representation, gd_variant, lambda, accuracy, precision, recall, f1
+    def save_results(self, results, csv_path, fieldnames):
         with open(csv_path, 'w', newline='') as csvfile:
-            fieldnames = ['dataset', 'representation', 'gd_variant', 'lambda', 'accuracy', 'precision', 'recall', 'f1']
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for result in results:

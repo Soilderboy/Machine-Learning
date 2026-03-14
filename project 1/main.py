@@ -3,6 +3,8 @@ import os
 import numpy as np
 import logisticRegression
 import evaluation
+import naiveBayes
+import csv
 #import evaluation
 
 """
@@ -55,6 +57,9 @@ if __name__ == "__main__":
     sets = ['train', 'test']
     #Flag to control whether to regenerate datasets from raw email or load from existing csv
     REGENERATE_DATA = False
+    LOGISTICREGRESSION = False
+    NAIVEBAYES = False
+    PRINTRESULTS = True
     
     if REGENERATE_DATA:
         #initalize data preparator
@@ -103,48 +108,109 @@ if __name__ == "__main__":
                 
                 test_csv_path = f"{dataset}_{representation}_test.csv"
                 preparator.save_to_csv(test_matrix, test_labels, vocab, test_csv_path)
+    if LOGISTICREGRESSION:
+        #logistic regression
+        results = []
+        evaluator = evaluation.Evaluation()
+        #load data
+        for dataset in dataset_names:
+            for representation in representations:
+                #load training csv/test csv
+                train_file = f"{dataset}_{representation}_train.csv"
+                test_file = f"{dataset}_{representation}_test.csv"
+                X_train, y_train = evaluation.Evaluation().load_csv_data(train_file)
+                X_test, y_test = evaluation.Evaluation().load_csv_data(test_file)
 
-    #logistic regression
-    results = []
-    evaluator = evaluation.Evaluation()
-    #load data
-    for dataset in dataset_names:
-        for representation in representations:
-            #load training csv/test csv
-            train_file = f"{dataset}_{representation}_train.csv"
-            test_file = f"{dataset}_{representation}_test.csv"
-            X_train, y_train = evaluation.Evaluation().load_csv_data(train_file)
-            X_test, y_test = evaluation.Evaluation().load_csv_data(test_file)
+                #split training data into train/validation
+                num_train_samples = X_train.shape[0]
+                indices = np.arange(num_train_samples) #arange creates array of indices from 0 to n
+                np.random.shuffle(indices) #random.shuffle shuffles indices in place
+                split_point = int(0.7 * num_train_samples)
+                train_indices = indices[:split_point]
+                val_indices = indices[split_point:]
+                X_train_split = X_train[train_indices]
+                y_train_split = y_train[train_indices]
+                X_val_split = X_train[val_indices]
+                y_val_split = y_train[val_indices]
 
-            #split training data into train/validation
-            num_train_samples = X_train.shape[0]
-            indices = np.arange(num_train_samples) #arange creates array of indices from 0 to n
-            np.random.shuffle(indices) #random.shuffle shuffles indices in place
-            split_point = int(0.7 * num_train_samples)
-            train_indices = indices[:split_point]
-            val_indices = indices[split_point:]
-            X_train_split = X_train[train_indices]
-            y_train_split = y_train[train_indices]
-            X_val_split = X_train[val_indices]
-            y_val_split = y_train[val_indices]
+                #for each GD variant, tune lambda, train final model, evaluate on test set, record metrics
+                gd_variants = ['batch', 'mini-batch', 'stochastic']
+                lambda_values = [0.01, 0.1, 1, 10]
 
-            #for each GD variant, tune lambda, train final model, evaluate on test set, record metrics
-            gd_variants = ['batch', 'mini-batch', 'stochastic']
-            lambda_values = [0.01, 0.1, 1, 10]
+                for gd_variant in gd_variants:
+                    best_lambda = evaluator.tune_lambda(X_train_split, y_train_split, X_val_split, y_val_split, lambda_values, gd_variant)
+                    metrics = evaluator.train_and_evaluate(X_train, y_train, X_test, y_test, best_lambda, gd_variant, max_iterations=500) 
+                    #record results in list of dicts
+                    result = {
+                        'dataset': dataset,
+                        'representation': representation,
+                        'gd_variant': gd_variant,
+                        'lambda': best_lambda,
+                        **metrics
+                    }
+                    print(result)
+                    #append result to results list
+                    results.append(result)
+        fieldnames = ['dataset', 'representation', 'gd_variant', 'lambda', 'accuracy', 'precision', 'recall', 'f1']
+        evaluator.save_results(results, 'logistic_regression_results.csv', fieldnames)
 
-            for gd_variant in gd_variants:
-                best_lambda = evaluator.tune_lambda(X_train_split, y_train_split, X_val_split, y_val_split, lambda_values, gd_variant)
-                metrics = evaluator.train_and_evaluate(X_train, y_train, X_test, y_test, best_lambda, gd_variant, max_iterations=500) 
-                #record results in list of dicts
-                result = {
-                    'dataset': dataset,
-                    'representation': representation,
-                    'gd_variant': gd_variant,
-                    'lambda': best_lambda,
-                    **metrics
-                }
-                print(result)
-                #append result to results list
-                results.append(result)
-    
-    evaluator.save_results(results, 'logistic_regression_results.csv')
+    if NAIVEBAYES:
+        #multinomial naive bayes
+        results = []
+        evaluator = evaluation.Evaluation()
+        for dataset in dataset_names:
+            #only bow
+            train_file = f"{dataset}_bow_train.csv"
+            test_file = f"{dataset}_bow_test.csv"
+            X_train, y_train = evaluator.load_csv_data(train_file)
+            X_test, y_test = evaluator.load_csv_data(test_file)
+
+            #train model and evaluate on test set
+            model = naiveBayes.MultinomialNaiveBayes()
+            model.fit(X_train, y_train)
+            metrics = model.evaluate(X_test, y_test)
+            result = {
+                'dataset': dataset,
+                'representation': 'bow',
+                **metrics
+            }
+            print(result)
+            results.append(result)
+
+            #bernoulli nb
+            train_file = f"{dataset}_bernoulli_train.csv"
+            test_file = f"{dataset}_bernoulli_test.csv"
+            X_train, y_train = evaluator.load_csv_data(train_file)
+            X_test, y_test = evaluator.load_csv_data(test_file)
+
+            model = naiveBayes.BernoulliNaiveBayes()
+            model.fit(X_train, y_train)
+            metrics = model.evaluate(X_test, y_test)
+            result = {
+                'dataset': dataset,
+                'representation': 'bernoulli',
+                **metrics
+            }
+            print(result)
+            results.append(result)
+        fieldnames = ['dataset', 'representation', 'accuracy', 'precision', 'recall', 'f1']
+        evaluator.save_results(results, 'naive_bayes_nb_results.csv', fieldnames)
+
+    #print results in table format
+    if PRINTRESULTS:
+        import pandas as pd
+        
+        #logistic regression results
+        print("\n" + "="*100)
+        print("Table 1: Logistic Regression Results")
+        print("="*100)
+        lr_df = pd.read_csv('logistic_regression_results.csv')
+        print(lr_df.to_string(index=False))
+        
+        #naive bayes results
+        print("\n" + "="*100)
+        print("Table 2: Naive Bayes results for different variants")
+        print("="*100)
+        nb_df = pd.read_csv('naive_bayes_nb_results.csv')
+        print(nb_df.to_string(index=False))
+        

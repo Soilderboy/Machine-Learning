@@ -40,7 +40,7 @@ class MultinomialNaiveBayes:
     def __init__(self):
         pass
     
-    #given labels, compute prior probabilities P(Y) for each calss and return as dict {class: prior_prob}
+    #given labels, compute prior probabilities P(Y) for each class and return as dict {class: prior_prob}
     def prior(self, y):
         #dictionary to store counts of each class
         #prior -> P(Y) = count(class) / total samples
@@ -117,6 +117,56 @@ class MultinomialNaiveBayes:
             f1 = 2 * (precision*recall) / (precision + recall)
         return {'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1}
 
-class BernoulliNaiveBayes:
+class BernoulliNaiveBayes(MultinomialNaiveBayes):
     def __init__(self):
         pass
+
+    #returns two vectors per class: presence, absence of each word in class
+    def likelihood(self, X, y):
+        #count word presence per class
+        vocab_size = X.shape[1]
+        alpha = 1 #laplace
+
+        #count total emails per class
+        class_email_counts = defaultdict(int)
+        for label in y:
+            class_email_counts[label] += 1
+        
+        #how many emails in class contain each word
+        word_presence_counts = {}
+        for label in class_email_counts:
+            mask = (y == label)
+            #count presence per word, axis = 0 sums down columns (across emails)
+            word_presence_counts[label] = np.sum(X[mask] > 0, axis=0)
+        likelihood_dict = {}
+        for label in word_presence_counts:
+            #likelihood = product(P(word present|class) if word present, P(word absent|class) if word absent)
+            #P(word present|class) = (count of emails in class with word + alpha) / (total emails in class + 2 * alpha)
+            total_emails_in_class = class_email_counts[label]
+            absence = total_emails_in_class - word_presence_counts[label]
+            likelihood_dict[label] = {
+                'presence': np.log((word_presence_counts[label] + alpha) / (total_emails_in_class + 2 * alpha)),
+                'absence': np.log((absence + alpha) / (total_emails_in_class + 2 * alpha))
+            }
+        return likelihood_dict
+            
+    def predict(self, X):
+        predictions = []
+        for i in range(X.shape[0]):
+            log_probs = {}
+            for label in self.prior_dict:
+                log_prob = self.prior_dict[label]
+                for j in range(X.shape[1]):
+                    if X[i][j] > 0: #choose presence or absence likelihood
+                        log_prob += self.likelihood_dict[label]['presence'][j]
+                    else:
+                        log_prob += self.likelihood_dict[label]['absence'][j]
+                log_probs[label] = log_prob
+            predicted_label = max(log_probs, key=log_probs.get)
+            predictions.append(predicted_label)
+        return np.array(predictions)
+    
+    def fit(self, X, y):
+        self.prior_dict = self.prior(y)
+        self.likelihood_dict = self.likelihood(X, y)
+        return self.prior_dict, self.likelihood_dict
