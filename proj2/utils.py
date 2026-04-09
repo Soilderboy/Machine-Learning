@@ -49,9 +49,9 @@ def get_dataset_combinations():
     return combinations
 
 def load_train_valid_test(clauses, data_size, base_path):
-    train_path = os.path.join(base_path, f'train_c{clauses}_d{data_size}_train.csv')
-    valid_path = os.path.join(base_path, f'valid_c{clauses}_d{data_size}_valid.csv')
-    test_path = os.path.join(base_path, f'test_c{clauses}_d{data_size}_test.csv')
+    train_path = os.path.join(base_path, f'train_c{clauses}_d{data_size}.csv')
+    valid_path = os.path.join(base_path, f'valid_c{clauses}_d{data_size}.csv')
+    test_path = os.path.join(base_path, f'test_c{clauses}_d{data_size}.csv')
     
     x_train, y_train = load_dataset(train_path)
     x_valid, y_valid = load_dataset(valid_path)

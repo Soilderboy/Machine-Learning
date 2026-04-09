@@ -1,6 +1,35 @@
-**/*.csv
-*.csv
-dataset/
+# Whitelist approach: only track code and docs, ignore everything else
+
+# Ignore all by default
+*
+!*/
+
+# Track only these file types
+!*.py
+!*.md
+!*.pdf
+
+# Explicitly ignore
 __pycache__/
 *.pyc
+*.pyo
 .DS_Store
+.git/
+.venv/
+
+# Data and large files
+*.csv
+*.zip
+*.tar
+*.gz
+*.pkl
+*.joblib
+data/
+*/data/
+dataset/
+*/dataset/
+*_data/
+dataMatrices/
+documentsGiven/
+get-pip.py
+test_output.txt
